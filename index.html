@@ -1,6 +1,10 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>تقارير الاختراقات</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -25,6 +29,8 @@
   --mark:#5c4d10; --danger:#ff8c82; --ok:#7fd3a2; color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0}
 body{
   background:var(--bg); color:var(--ink); font-family:var(--font); font-size:16px; line-height:1.7;
   padding-left:max(16px, env(safe-area-inset-left, 0px));
@@ -124,6 +130,8 @@ input:focus-visible, button:focus-visible{outline:2px solid var(--accent); outli
 #pdfroot .ft{position:absolute; left:0; right:0; bottom:0; height:60px; padding:0 56px; display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#7a8c94; border-top:1px solid #e3ecef}
 #pdfroot .pn{direction:ltr; unicode-bidi:isolate}
 </style>
+</head>
+<body>
 
 <main class="app" dir="rtl" lang="ar">
   <header class="top">
@@ -573,7 +581,14 @@ async function makePdf(ctx, blocks){
 }
 
 /* ---------- download ---------- */
-var dlPromise = (window.claude && window.claude.use) ? window.claude.use('downloads').catch(function(){ return null; }) : Promise.resolve(null);
+function saveFile(name, buf){
+  var blob = new Blob([buf], { type: 'application/pdf' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = name; a.style.display = 'none';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 4000);
+}
 function setBusy(b){ goBtn.disabled = b; goTxt.textContent = b ? 'جارٍ إنشاء الملف…' : 'تحميل PDF'; }
 
 async function onDownload(){
@@ -583,8 +598,6 @@ async function onDownload(){
   if(!selected){ setMsg('اختر اسم الباحث من القائمة.', 'err'); return; }
   if(!blocks.length){ setMsg('اكتب نص التقرير أولاً.', 'err'); ed.focus(); return; }
   if(!window.html2canvas || !window.jspdf){ setMsg('تعذّر تحميل أدوات إنشاء الملف. تحقق من الاتصال ثم أعد فتح الصفحة.', 'err'); return; }
-  var dl = await dlPromise;
-  if(!dl){ setMsg('حفظ الملفات غير متاح في هذا العرض. افتح رابط الصفحة في المتصفح أو في تطبيق Claude.', 'err'); return; }
 
   var t = todayInfo();
   var ctx = { title: title, name: selected, long: t.long };
@@ -593,8 +606,8 @@ async function onDownload(){
     var buf = await makePdf(ctx, blocks);
     var base = title.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40).trim().replace(/\.+$/, '');
     var fname = (base || 'تقرير') + '.pdf';
-    await dl.save({ filename: fname, data: buf });
-    setMsg('تم حفظ الملف.', 'ok');
+    saveFile(fname, buf);
+    setMsg('تم تنزيل الملف.', 'ok');
   } catch(e){
     if(e && e.code === 'declined') setMsg('لم يتم الحفظ. اضغط على الزر لإعادة المحاولة.', 'info');
     else if(e && e.code === 'rate_limited') setMsg('انتظر لحظة ثم أعد المحاولة.', 'err');
@@ -621,4 +634,5 @@ $('#form').addEventListener('submit', function(e){ e.preventDefault(); onDownloa
 })();
 </script>
 
-</body></html>
+</body>
+</html>
