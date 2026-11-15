@@ -97,6 +97,8 @@ input:focus-visible, button:focus-visible{outline:2px solid var(--accent); outli
 .btn.pri:disabled{opacity:.65; cursor:progress}
 .btn.sec{background:var(--surface); color:var(--ink); border:1px solid var(--line)}
 .btn svg{width:20px; height:20px; flex:none}
+.ready{display:flex; flex-direction:column; gap:10px; padding:14px; border:1px dashed var(--accent); border-radius:12px; background:var(--tint)}
+.ready p{margin:0; font-size:.92rem; color:var(--accent-text); overflow-wrap:anywhere}
 .msg{margin:0; min-height:1.7em; font-size:.95rem; color:var(--muted)}
 .msg.err{color:var(--danger)}
 .msg.ok{color:var(--ok); font-weight:600}
@@ -183,6 +185,10 @@ input:focus-visible, button:focus-visible{outline:2px solid var(--accent); outli
       </button>
       <button type="button" class="btn sec" id="reset">تفريغ الكل</button>
     </div>
+    <div class="ready" id="ready" hidden>
+        <p id="readyName"></p>
+        <button type="button" class="btn pri" id="shareBtn">حفظ أو مشاركة الملف</button>
+      </div>
     <p class="msg" id="msg" role="status" aria-live="polite"></p>
   </form>
 </main>
@@ -589,6 +595,14 @@ function saveFile(name, buf){
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 4000);
 }
+var readyBox = $('#ready'), shareBtn = $('#shareBtn'), pending = null;
+function isIOS(){ return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function canShareFile(f){ try { return !!(navigator.canShare && navigator.share && navigator.canShare({ files: [f] })); } catch(e){ return false; } }
+shareBtn.addEventListener('click', async function(){
+  if(!pending) return;
+  try { await navigator.share({ files: [pending] }); }
+  catch(e){ if(e && e.name === 'AbortError') return; saveFile(pending.name, pending); }
+});
 function setBusy(b){ goBtn.disabled = b; goTxt.textContent = b ? 'جارٍ إنشاء الملف…' : 'تحميل PDF'; }
 
 async function onDownload(){
@@ -601,13 +615,22 @@ async function onDownload(){
 
   var t = todayInfo();
   var ctx = { title: title, name: selected, long: t.long };
+  readyBox.hidden = true; pending = null;
   setBusy(true); setMsg('جارٍ إنشاء الملف…', 'info');
   try {
     var buf = await makePdf(ctx, blocks);
-    var base = title.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40).trim().replace(/\.+$/, '');
+    var base = title.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100).trim().replace(/\.+$/, '');
     var fname = (base || 'تقرير') + '.pdf';
-    saveFile(fname, buf);
-    setMsg('تم تنزيل الملف.', 'ok');
+    var file = new File([buf], fname, { type: 'application/pdf' });
+    if(isIOS() && canShareFile(file)){
+      pending = file;
+      $('#readyName').textContent = 'الملف جاهز: ' + fname;
+      readyBox.hidden = false;
+      setMsg('اضغط «حفظ أو مشاركة الملف» لحفظه في الملفات أو إرساله مباشرة.', 'ok');
+    } else {
+      saveFile(fname, file);
+      setMsg('تم تنزيل الملف.', 'ok');
+    }
   } catch(e){
     if(e && e.code === 'declined') setMsg('لم يتم الحفظ. اضغط على الزر لإعادة المحاولة.', 'info');
     else if(e && e.code === 'rate_limited') setMsg('انتظر لحظة ثم أعد المحاولة.', 'err');
